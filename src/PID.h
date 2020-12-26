@@ -45,6 +45,10 @@ class PID {
   double Kp;
   double Ki;
   double Kd;
+
+  bool bFirstUpdate;
+  double prev_cte;
+  double sum_cte;
 };
 
 #endif  // PID_H

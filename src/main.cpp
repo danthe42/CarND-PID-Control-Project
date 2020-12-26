@@ -1,5 +1,11 @@
 #include <math.h>
+
+#ifdef UWS_VCPKG
+#include <uwebsockets/App.h>
+#else
 #include <uWS/uWS.h>
+#endif 
+
 #include <iostream>
 #include <string>
 #include "json.hpp"
@@ -8,6 +14,8 @@
 // for convenience
 using nlohmann::json;
 using std::string;
+using std::min;
+using std::max;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -29,6 +37,8 @@ string hasData(string s) {
   }
   return "";
 }
+
+#ifndef UWS_VCPKG
 
 int main() {
   uWS::Hub h;
@@ -103,3 +113,93 @@ int main() {
   
   h.run();
 }
+
+#else 
+
+int main() {
+
+    PID pid;
+    /**
+     * TODO: Initialize the pid variable.
+     */
+    pid.Init(2.4568549544323997, 9.45673250182314, 0.2500180567507747);
+	struct PerSocketData {
+
+	};
+
+	int port = 4567;
+
+	uWS::App::WebSocketBehavior b;
+
+	b.open = [](auto* ws) {
+		std::cout << "Connected!!!" << std::endl;
+	};
+	b.close = [](auto* ws, int /*code*/, std::string_view /*message*/) {
+		ws->close();
+		std::cout << "Disconnected" << std::endl;
+	};
+
+	b.message = [&pid](auto * ws, std::string_view message, uWS::OpCode opCode) {
+        // "42" at the start of the message means there's a websocket message event.
+        // The 4 signifies a websocket message
+        // The 2 signifies a websocket event
+		size_t length = message.length();
+		const char* data = message.data();
+        if (length && length > 2 && data[0] == '4' && data[1] == '2') {
+            auto s = hasData(string(data).substr(0, length));
+
+            if (s != "") {
+                auto j = json::parse(s);
+
+                string event = j[0].get<string>();
+
+                if (event == "telemetry") {
+                    // j[1] is the data JSON object
+                    double cte = std::stod(j[1]["cte"].get<string>());
+                    double speed = std::stod(j[1]["speed"].get<string>());
+                    double angle = std::stod(j[1]["steering_angle"].get<string>());
+                    double steer_value;
+                    /**
+                     * TODO: Calculate steering value here, remember the steering value is
+                     *   [-1, 1].
+                     * NOTE: Feel free to play around with the throttle and speed.
+                     *   Maybe use another PID controller to control the speed!
+                     */
+                    pid.UpdateError(cte);
+                    steer_value = pid.TotalError();
+                    steer_value = min(steer_value, 1.0);
+					steer_value = max(steer_value, -1.0);
+
+					// DEBUG
+                    std::cout << "CTE: " << cte << " Steering Value: " << steer_value
+                        << std::endl;
+
+                    json msgJson;
+                    msgJson["steering_angle"] = steer_value;
+                    msgJson["throttle"] = 0.3;
+                    auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+                    std::cout << msg << std::endl;
+                    ws->send(msg, uWS::OpCode::TEXT);
+                }  // end "telemetry" if
+            }
+            else {
+                // Manual driving
+                string msg = "42[\"manual\",{}]";
+                ws->send(msg, uWS::OpCode::TEXT);
+            }
+        }  // end websocket message if
+    }; // end h.onMessage
+
+    uWS::App().ws<PerSocketData>("/*", std::move(b)).listen("127.0.0.1", port, [port](auto* listen_socket) {
+        if (listen_socket) {
+            std::cout << "Listening on port " << port << std::endl;
+        }
+        else {
+            std::cerr << "Failed to listen to port" << std::endl;
+            exit(-1);
+        }
+    }).run();
+
+}
+
+#endif 
