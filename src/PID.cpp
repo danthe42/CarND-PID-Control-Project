@@ -150,7 +150,7 @@ void PIDTRAINER::ready()
 		if (err < best_err) {
 			thisisbest(err);
 			deltas[curparamidx] *= 1.1;
-			curparamidx = (++curparamidx) % 3;
+			curparamidx = (curparamidx + 1) % 3;
 			execstart();
 		}
 		else
@@ -172,14 +172,14 @@ void PIDTRAINER::ready()
 			thisisbest(err);
 
 			deltas[curparamidx] *= 1.1;
-			curparamidx = (++curparamidx) % 3;
+			curparamidx = (curparamidx + 1) % 3;
 			execstart();
 		}
 		else
 		{
 			params[curparamidx] += deltas[curparamidx];
 			deltas[curparamidx] *= 0.9;
-			curparamidx = (++curparamidx) % 3;
+			curparamidx = (curparamidx + 1) % 3;
 			execstart();
 		}
 		break;

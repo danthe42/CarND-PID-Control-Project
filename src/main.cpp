@@ -45,16 +45,57 @@ int main() {
   uWS::Hub h;
 
   PID pid;
-  /**
-   * TODO: Initialize the pid variable.
-   */
+	PID pid_throttle;
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
+    double p1, d1, i1, de1, de2, de3;
+
+    // the previously fine-tuned, best PID coefficients
+//    p1 = 0.168901;
+//    i1 = 0.00517276;
+//    d1 = 3.87919;
+	p1 = 0.15;
+	i1 = 0.006;
+	d1 = 4;
+
+#ifdef USE_TRAINING
+    if (argc == 7)
+    {
+        p1 = atof(argv[1]);
+		i1 = atof(argv[2]);
+		d1 = atof(argv[3]);
+		de1 = atof(argv[4]);
+		de2 = atof(argv[5]);
+		de3 = atof(argv[6]);
+    }
+
+	PIDTRAINER pt(&pid, 1000, p1, i1, d1, de1, de2, de3);
+	double optimal_speed = 75;
+
+#else 
+    void* pt = nullptr;
+	double optimal_speed = 50;
+#endif 
+
+    pid.Init(p1, i1, d1);              
+    pid_throttle.Init(9999, 0, 0);
+
+  h.onMessage([&pt, &pid, &pid_throttle, &optimal_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
+#ifdef USE_TRAINING
+			if (pid.samplenum == pt.target_samplenum) {
+                pt.ready();
+				std::string msg = "42[\"reset\",{}]";
+				//						std::string msg = "42[\"reset\",{}​​​​​]";
+				ws->send(msg, uWS::OpCode::TEXT);
+                pid.samplenum = 0;
+                return;
+			}
+#endif 
+
       auto s = hasData(string(data).substr(0, length));
 
       if (s != "") {
@@ -68,13 +109,16 @@ int main() {
           double speed = std::stod(j[1]["speed"].get<string>());
           double angle = std::stod(j[1]["steering_angle"].get<string>());
           double steer_value;
-          /**
-           * TODO: Calculate steering value here, remember the steering value is
-           *   [-1, 1].
-           * NOTE: Feel free to play around with the throttle and speed.
-           *   Maybe use another PID controller to control the speed!
-           */
-          
+
+                    pid.UpdateError(cte, speed, angle);
+                    steer_value = pid.TotalError();
+                    steer_value = min(steer_value, 1.0);
+					steer_value = max(steer_value, -1.0);
+                    pid_throttle.UpdateError(speed - optimal_speed, speed, angle);
+                    double throttle = pid_throttle.TotalError();
+					throttle = min(throttle, 0.80);
+                    throttle = max(throttle, 0.0);
+
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value 
                     << std::endl;
