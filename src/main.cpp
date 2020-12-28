@@ -11,6 +11,7 @@
 	// When the Udacity version of the uwebsockets library is used
 	#include <uWS/uWS.h>
 	#include "json.hpp"
+//	#include "json_300.hpp"
 #endif 
 
 #include "PID.h"
@@ -91,7 +92,7 @@ void logic( PID &pid, PID &pid_throttle, double cte, double speed, double angle,
 	steer_value = max(steer_value, -1.0);
 	pid_throttle.UpdateError(speed - optimal_speed, speed, angle);
 	throttle = pid_throttle.TotalError();
-	throttle = min(throttle, 0.8);
+	throttle = min(throttle, 0.3);
 	throttle = max(throttle, 0.0);
 };
 
@@ -102,7 +103,7 @@ std::string process_message(const char* data, size_t length, PID& pid, PID& pid_
 	std::string msg;
 	if (length && length > 2 && data[0] == '4' && data[1] == '2') {
 
-		if (!pt)
+		if (pt)
 		{
 			if (pid.samplenum == pt->target_samplenum) 
 			{
@@ -151,7 +152,7 @@ std::string process_message(const char* data, size_t length, PID& pid, PID& pid_
 
 #ifndef UWS_VCPKG
 
-int main() {
+int main(int argc, char **argv) {
   uWS::Hub h;
 
   PID pid;
@@ -164,8 +165,11 @@ int main() {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
+    	printf("msg1\n");
 	  auto msg = process_message(data, length, pid, pid_throttle);
+    	printf("msg11\n");
 	  ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);	  
+    	printf("msg2\n");
   }); // end h.onMessage
 
   h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
