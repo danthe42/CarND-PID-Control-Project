@@ -22,6 +22,13 @@ using std::endl;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+PIDTRAINER* pt = nullptr;
+
+#ifdef USE_TRAINING
+	double optimal_speed = 75;
+#else 
+	double optimal_speed = 50;
+#endif 
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -39,17 +46,11 @@ string hasData(string s) {
   return "";
 }
 
-#ifndef UWS_VCPKG
+void init(int argc, char** argv, PID& pid, PID& pid_throttle)
+{
+	double p1, d1, i1;
 
-int main() {
-  uWS::Hub h;
-
-  PID pid;
-	PID pid_throttle;
-
-    double p1, d1, i1, de1, de2, de3;
-
-    // the previously fine-tuned, best PID coefficients
+	// the previously fine-tuned, best PID coefficients
 //    p1 = 0.168901;
 //    i1 = 0.00517276;
 //    d1 = 3.87919;
@@ -58,84 +59,105 @@ int main() {
 	d1 = 4;
 
 #ifdef USE_TRAINING
-    if (argc == 7)
-    {
-        p1 = atof(argv[1]);
+	double de1, de2, de3;
+	if (argc == 7)
+	{
+		p1 = atof(argv[1]);
 		i1 = atof(argv[2]);
 		d1 = atof(argv[3]);
 		de1 = atof(argv[4]);
 		de2 = atof(argv[5]);
 		de3 = atof(argv[6]);
-    }
+	}
 
-	PIDTRAINER pt(&pid, 1000, p1, i1, d1, de1, de2, de3);
-	double optimal_speed = 75;
-
-#else 
-    void* pt = nullptr;
-	double optimal_speed = 50;
+	pt = new PIDTRAINER(&pid, 1000, p1, i1, d1, de1, de2, de3);
 #endif 
 
-    pid.Init(p1, i1, d1);              
-    pid_throttle.Init(9999, 0, 0);
+	pid.Init(p1, i1, d1);
+	pid_throttle.Init(9999, 0, 0);
+}
 
-  h.onMessage([&pt, &pid, &pid_throttle, &optimal_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
+void logic( PID &pid, PID &pid_throttle, double cte, double speed, double angle, double& steer_value, double& throttle) 
+{
+	pid.UpdateError(cte, speed, angle);
+	steer_value = pid.TotalError();
+	steer_value = min(steer_value, 1.0);
+	steer_value = max(steer_value, -1.0);
+	pid_throttle.UpdateError(speed - optimal_speed, speed, angle);
+	throttle = pid_throttle.TotalError();
+	throttle = min(throttle, 0.8);
+	throttle = max(throttle, 0.0);
+};
+
+std::string process_message(const char* data, size_t length, PID& pid, PID& pid_throttle)
+{
+	std::string msg;
+	if (length && length > 2 && data[0] == '4' && data[1] == '2') {
+
+		if (!pt)
+		{
+			if (pid.samplenum == pt->target_samplenum) 
+			{
+				pt->ready();
+				pid.samplenum = 0;
+				msg = "42[\"reset\",{}]";
+				return msg;
+			}
+		}
+
+		auto s = hasData(string(data).substr(0, length));
+
+		if (s != "") {
+			auto j = json::parse(s);
+
+			string event = j[0].get<string>();
+
+			if (event == "telemetry") {
+				// j[1] is the data JSON object
+				double cte = std::stod(j[1]["cte"].get<string>());
+				double speed = std::stod(j[1]["speed"].get<string>());
+				double angle = std::stod(j[1]["steering_angle"].get<string>());
+				double steer_value, throttle;
+
+				logic(pid, pid_throttle, cte, speed, angle, steer_value, throttle);
+
+				// DEBUG
+				std::cout << "CTE: " << cte << " Steering Value: " << steer_value
+					<< std::endl;
+
+				json msgJson;
+				msgJson["steering_angle"] = steer_value;
+				msgJson["throttle"] = throttle;
+				msg = "42[\"steer\"," + msgJson.dump() + "]";
+				std::cout << msg << std::endl;
+			}  // end "telemetry" if
+		}
+		else {
+			// Manual driving
+			msg = "42[\"manual\",{}]";
+		}
+	}  // end websocket message if
+
+	return msg;
+}
+
+#ifndef UWS_VCPKG
+
+int main() {
+  uWS::Hub h;
+
+  PID pid;
+  PID pid_throttle;
+
+  init(argc, argv, pid, pid_throttle);
+
+  h.onMessage([&pid, &pid_throttle](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
-    if (length && length > 2 && data[0] == '4' && data[1] == '2') {
-#ifdef USE_TRAINING
-			if (pid.samplenum == pt.target_samplenum) {
-                pt.ready();
-				std::string msg = "42[\"reset\",{}]";
-				//						std::string msg = "42[\"reset\",{}​​​​​]";
-				ws->send(msg, uWS::OpCode::TEXT);
-                pid.samplenum = 0;
-                return;
-			}
-#endif 
-
-      auto s = hasData(string(data).substr(0, length));
-
-      if (s != "") {
-        auto j = json::parse(s);
-
-        string event = j[0].get<string>();
-
-        if (event == "telemetry") {
-          // j[1] is the data JSON object
-          double cte = std::stod(j[1]["cte"].get<string>());
-          double speed = std::stod(j[1]["speed"].get<string>());
-          double angle = std::stod(j[1]["steering_angle"].get<string>());
-          double steer_value;
-
-                    pid.UpdateError(cte, speed, angle);
-                    steer_value = pid.TotalError();
-                    steer_value = min(steer_value, 1.0);
-					steer_value = max(steer_value, -1.0);
-                    pid_throttle.UpdateError(speed - optimal_speed, speed, angle);
-                    double throttle = pid_throttle.TotalError();
-					throttle = min(throttle, 0.80);
-                    throttle = max(throttle, 0.0);
-
-          // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value 
-                    << std::endl;
-
-          json msgJson;
-          msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
-          auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-        }  // end "telemetry" if
-      } else {
-        // Manual driving
-        string msg = "42[\"manual\",{}]";
-        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-      }
-    }  // end websocket message if
+	  auto msg = process_message(data, length, pid, pid_throttle);
+	  ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);	  
   }); // end h.onMessage
 
   h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
@@ -166,37 +188,7 @@ int main(int argc, char **argv) {
     PID pid;
 	PID pid_throttle;
 
-    double p1, d1, i1, de1, de2, de3;
-
-    // the previously fine-tuned, best PID coefficients
-//    p1 = 0.168901;
-//    i1 = 0.00517276;
-//    d1 = 3.87919;
-	p1 = 0.15;
-	i1 = 0.006;
-	d1 = 4;
-
-#ifdef USE_TRAINING
-    if (argc == 7)
-    {
-        p1 = atof(argv[1]);
-		i1 = atof(argv[2]);
-		d1 = atof(argv[3]);
-		de1 = atof(argv[4]);
-		de2 = atof(argv[5]);
-		de3 = atof(argv[6]);
-    }
-
-	PIDTRAINER pt(&pid, 1000, p1, i1, d1, de1, de2, de3);
-	double optimal_speed = 75;
-
-#else 
-    void* pt = nullptr;
-	double optimal_speed = 50;
-#endif 
-
-    pid.Init(p1, i1, d1);              
-    pid_throttle.Init(9999, 0, 0);
+	init(argc, argv, pid, pid_throttle);
 
 	struct PerSocketData {
         int something;
@@ -205,7 +197,6 @@ int main(int argc, char **argv) {
 	int port = 4567;
 
 	uWS::App::WebSocketBehavior b;
-    b.compression = uWS::CompressOptions::SHARED_COMPRESSOR;
     b.maxPayloadLength = 16 * 1024 * 1024;
 	b.open = [](auto* ws) {
 		std::cout << "Connected!!!" << std::endl;
@@ -214,78 +205,16 @@ int main(int argc, char **argv) {
 		ws->close();
 		std::cout << "Disconnected" << std::endl;
 	};
-    b.upgrade = [](auto* res, auto* req, auto* context) {
-        res->template upgrade<PerSocketData>({
-            /* We initialize PerSocketData struct here */
-                
-			}, req->getHeader("sec-websocket-key"),
-			req->getHeader("sec-websocket-protocol"),
-			req->getHeader("sec-websocket-extensions"),
-			context);
-		int alma = 0;
-    };
 
 
-    b.message = [&pt, &pid, &pid_throttle, &optimal_speed](auto* ws, std::string_view message, uWS::OpCode opCode) {
+    b.message = [&pid, &pid_throttle](auto* ws, std::string_view message, uWS::OpCode opCode) {
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
         // The 2 signifies a websocket event
 		size_t length = message.length();
 		const char* data = message.data();
-        if (length && length > 2 && data[0] == '4' && data[1] == '2') {
-
-#ifdef USE_TRAINING
-			if (pid.samplenum == pt.target_samplenum) {
-                pt.ready();
-				std::string msg = "42[\"reset\",{}]";
-				//						std::string msg = "42[\"reset\",{}​​​​​]";
-				ws->send(msg, uWS::OpCode::TEXT);
-                pid.samplenum = 0;
-                return;
-			}
-#endif 
-
-            auto s = hasData(string(data).substr(0, length));
-
-            if (s != "") {
-                auto j = json::parse(s);
-
-                string event = j[0].get<string>();
-
-                if (event == "telemetry") {
-                    // j[1] is the data JSON object
-                    double cte = std::stod(j[1]["cte"].get<string>());
-                    double speed = std::stod(j[1]["speed"].get<string>());
-                    double angle = std::stod(j[1]["steering_angle"].get<string>());
-                    double steer_value;
-
-                    pid.UpdateError(cte, speed, angle);
-                    steer_value = pid.TotalError();
-                    steer_value = min(steer_value, 1.0);
-					steer_value = max(steer_value, -1.0);
-                    pid_throttle.UpdateError(speed - optimal_speed, speed, angle);
-                    double throttle = pid_throttle.TotalError();
-					throttle = min(throttle, 0.80);
-                    throttle = max(throttle, 0.0);
-
-					// DEBUG
-                    std::cout << "CTE: " << cte << " Steering Value: " << steer_value
-                        << std::endl;
-
-                    json msgJson;
-                    msgJson["steering_angle"] = steer_value;
-                    msgJson["throttle"] = throttle;
-                    auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-                    std::cout << msg << std::endl;
-                    ws->send(msg, uWS::OpCode::TEXT);
-                }  // end "telemetry" if
-            }
-            else {
-                // Manual driving
-                string msg = "42[\"manual\",{}]";
-                ws->send(msg, uWS::OpCode::TEXT);
-            }
-        }  // end websocket message if
+		auto msg = process_message(data, length, pid, pid_throttle);
+		ws->send(msg, uWS::OpCode::TEXT);
     }; // end h.onMessage
 
     uWS::App().ws<PerSocketData>("/*", std::move(b)).listen("127.0.0.1", port, [port](auto* listen_socket) {
