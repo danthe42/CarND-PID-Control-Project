@@ -50,6 +50,6 @@ To find the best coefficients for the steering angle PID controller, I have used
 * The automatic twiddle algorithm could not be used for a long time because of the simulator, as it hangs (does not react to any user input and does not connect) after about half a day. I was using the _magic_ '42["reset",{}]' message to restart the simulator everytime, maybe it was not tested ? 
 * json.hpp could not be used with the newest STL on windows, as it's a very old version (2.1.1). I had to copy the json.hpp from the CarND-Path-Planning project, it's newer and it compiles correctly (it's version is 3.0.0). 
 * Sometime the websocket connection handshaking fails, and the connection forcibly closed by the server (PID controller app). The cause of this is that the maximum message length ( payload ) is by default only 16Kbytes in the uwebsockets implementation. If I start the simulator first, then the PID controller a little bit later, it often led to failed connection attempts. I have fixed this for the newest version used on my local windows machine ( when UWS_VCPKG is defined in the beginning of main.cpp ) but the Udacity version still contain this error.      
-* Oscillations are still too annoying. There should be a way to decrease them further. 
+* Oscillations are still too annoying. There should be a way to decrease these further. 
 
  
