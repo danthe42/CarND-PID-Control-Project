@@ -1,14 +1,18 @@
 ﻿#include <math.h>
-
-#ifdef UWS_VCPKG
-#include <uwebsockets/App.h>
-#else
-#include <uWS/uWS.h>
-#endif 
-
 #include <iostream>
 #include <string>
-#include "json.hpp"
+
+#ifdef UWS_VCPKG
+	// On windows, using the latest uwebsockets library
+	#include <uwebsockets/App.h>
+	#include "json_300.hpp"
+
+#else
+	// When the Udacity version of the uwebsockets library is used
+	#include <uWS/uWS.h>
+	#include "json.hpp"
+#endif 
+
 #include "PID.h"
 
 // for convenience
@@ -46,6 +50,7 @@ string hasData(string s) {
   return "";
 }
 
+// initialize the PID controllers and if configured also init. the PIDTRAINER
 void init(int argc, char** argv, PID& pid, PID& pid_throttle)
 {
 	double p1, d1, i1;
@@ -77,6 +82,7 @@ void init(int argc, char** argv, PID& pid, PID& pid_throttle)
 	pid_throttle.Init(9999, 0, 0);
 }
 
+// the logic which uses the 2 PID controllers to control the new steer_value and throttle
 void logic( PID &pid, PID &pid_throttle, double cte, double speed, double angle, double& steer_value, double& throttle) 
 {
 	pid.UpdateError(cte, speed, angle);
@@ -89,6 +95,8 @@ void logic( PID &pid, PID &pid_throttle, double cte, double speed, double angle,
 	throttle = max(throttle, 0.0);
 };
 
+// process an incoming websocket message
+// It contains the logic which restarts the simulation when a run is finished.
 std::string process_message(const char* data, size_t length, PID& pid, PID& pid_throttle)
 {
 	std::string msg;

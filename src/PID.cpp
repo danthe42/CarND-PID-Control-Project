@@ -15,7 +15,7 @@ void PID::Set_Train_SampleLen(int _total_samplelen) {
 
 void PID::Init(double Kp_, double Ki_, double Kd_) {
   /**
-   * TODO: Initialize PID coefficients (and errors, if needed)
+   * Initialize PID coefficients and other attributes
    */
 	Kp = Kp_;
 	Ki = Ki_;
@@ -56,7 +56,7 @@ void PID::UpdateError(double cte, double speed, double angle) {
 	angle_error = 0;
 #endif
 
-//	if (total_samplelen < samplenum * 2)
+	if (total_samplelen < samplenum * 2)			// only use the second half of this run
 	{
 		total_cte_err += cte * cte + spd_error + angle_error;
 		sum_spd += speed;
@@ -64,7 +64,8 @@ void PID::UpdateError(double cte, double speed, double angle) {
 	}
 }
 
-double PID::GetTotalErrorOnWholeSample(PIDTRAINER * pt) {
+// get the average cost value for the simulation just finished
+double PID::GetCostValue(PIDTRAINER * pt) {
 
 #ifdef USE_LOGGING
 	if (pt)
@@ -115,7 +116,6 @@ void PIDTRAINER::ready()
 #ifdef USE_LOGGING
 		logfile << "Best err: " << best_err << " Params: " << best_params[0] << " " << best_params[1] << " " << best_params[2] << " " << best_deltas[0] << " " << best_deltas[1] << " " << best_deltas[2] << " Cur_deltas[" << deltas[0] << " " << deltas[1] << " " << deltas[2] << "]" << endl;
 		logfile.flush();
-		prev_best = best_err;
 #endif
 	}
 
@@ -129,7 +129,7 @@ void PIDTRAINER::ready()
 
 	switch (curstate) {
 	case START:
-		thisisbest(pid->GetTotalErrorOnWholeSample(this));
+		best_found(pid->GetCostValue(this));
 
 #ifdef USE_LOGGING
 		logfile << "START Best err: " << best_err << " Params: " << best_params[0] << " " << best_params[1] << " " << best_params[2] << " " << best_deltas[0] << " " << best_deltas[1] << " " << best_deltas[2] << endl;
@@ -141,14 +141,14 @@ void PIDTRAINER::ready()
 		execstart();
 		break;
 	case PARAMINCREASED:
-		err = pid->GetTotalErrorOnWholeSample(this);
+		err = pid->GetCostValue(this);
 #ifdef USE_LOGGING
 		logfile << "state=" << int(curstate) << " curparamidx=" << curparamidx << " cur_err=" << err << endl;
 		logfile.flush();
 #endif
 
 		if (err < best_err) {
-			thisisbest(err);
+			best_found(err);
 			deltas[curparamidx] *= 1.1;
 			curparamidx = (curparamidx + 1) % 3;
 			execstart();
@@ -161,7 +161,7 @@ void PIDTRAINER::ready()
 		}
 		break;
 	case PARAMDECREASED:
-		err = pid->GetTotalErrorOnWholeSample(this);
+		err = pid->GetCostValue(this);
 #ifdef USE_LOGGING
 		logfile << "state=" << int(curstate) << " curparamidx=" << curparamidx << " cur_err=" << err << endl;
 		logfile.flush();
@@ -169,7 +169,7 @@ void PIDTRAINER::ready()
 
 		if (err < best_err)
 		{
-			thisisbest(err);
+			best_found(err);
 
 			deltas[curparamidx] *= 1.1;
 			curparamidx = (curparamidx + 1) % 3;
@@ -188,7 +188,7 @@ void PIDTRAINER::ready()
 	}
 };
 
-void PIDTRAINER::thisisbest(double err)
+void PIDTRAINER::best_found(double err)
 {
 	best_err = err;
 	best_params[0] = params[0];
