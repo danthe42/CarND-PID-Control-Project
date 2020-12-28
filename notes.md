@@ -43,8 +43,10 @@ To find the best coefficients for the steering angle PID controller, I have used
 - Auto, with Speed as error (used when USE_SPEED_WEIGHT is #defined): I've tried to add speed_errors to the PID::GetTotalErrorOnWholeSample() summarized error value used in the twiddle algorithm ( spd_error = 2000*exp( -speed/50.0 ); ) because this error and the speed value are inversely proportional. Here I wanted the car to go faster, and wished that the oscillations would also be smaller. However It didn't improve too much, so I have rarely used this weighting. 
 - Auto, with Angle as error (used when USE_SPEED_WEIGHT is #defined): I've tried to add steering_angle to the PID::GetTotalErrorOnWholeSample() summarized error value used in the twiddle algorithm ( 1000 * ( 1 - exp(-abs(angle) / 25.0) ); ). I wanted the control to direct a car more smoothly, so I added this weight based on the absolute value of the steering angle. I also used this rarely, because it did not result any visible improvement.
 
- All these methods were used to find the final hyperparameters.  
+All these methods were used to find the final hyperparameters.  
 
+The logging of the PIDTRAINER can be switched on by #define-ing USE_LOGGING at the beginning of pid.h. When it's on, the application will create a log.txt log file in the working directory with many useful information about the steps of the twiddle algorithm, the scores after each run, and the best PID controller parameters if they are found. 
+ 
 ## Other: Problems, issues, possible future enhancements/ideas
 
 * The automatic twiddle algorithm could not be used for a long time because of the simulator, as it hangs (does not react to any user input and does not connect) after about half a day. I was using the _magic_ '42["reset",{}]' message to restart the simulator everytime, maybe it was not tested ? 
