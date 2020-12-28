@@ -1,5 +1,5 @@
 # PID controller system architecture
-The system consists of components:
+The system consists of two components:
 - A simulator which was developed by Udacity in Unity and displays our car driving on a race track around a lake,
 - And a PID controller which directs the car by controlling its steering wheel angle and throttle (gas pedal) in every time slice.
   There is a websocket (http-based data communiaction protocol) based communication between these two. 
