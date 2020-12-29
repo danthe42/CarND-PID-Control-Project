@@ -4,10 +4,10 @@
 #include <fstream>
 
 // If you want to use logging for PIDTRAINER, enable this
-#define USE_LOGGING
+//#define USE_LOGGING
 
 // If you want to use PIDTRAINER, enable this
-#define USE_TRAINING
+//#define USE_TRAINING
 
 // To use Speed_weight with in the PIDTRAINER full sample error, uncomment this
 //#define USE_SPEED_WEIGHT
