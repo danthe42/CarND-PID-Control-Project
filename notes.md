@@ -1,6 +1,6 @@
 # PID controller system architecture
 The system consists of two components:
-- A simulator which was developed by Udacity in Unity and displays our car driving on a race track around a lake,
+- A simulator which was developed by Udacity in Unity and simulates/displays our car driving on a track around,
 - And a PID controller which directs the car by controlling its steering wheel angle and throttle (gas pedal) in every time slice.
   There is a websocket (http-based data communiaction protocol) based communication between these two. 
 The development of the latter component was my project task in the Self-Driving Car Engineer Nanodegree Program. So, in the following part of this document I will describe that.
@@ -15,10 +15,11 @@ The message from the simulator contains fields:
 - CTE - The cross-track error is an error value which is proportional to the (signed) distance of the car from the center of the road.
 - speed - Current speed of the car
 - steering_angle - Current steering angle of the car, in degrees
-  The algorithm use the _steering_angle_ value only in the _Cost_ function of PIDTRAINING where it's configured, and the _speed_ parameter is used 
+  The CTE value is the most important to calculate the new steering angle, as it's the current error value. 
+  the algorithm uses the _steering_angle_ value only in the _Cost_ function of PIDTRAINING when it's configured to do so, and the _speed_ parameter is used 
     - during training to calculate the average speed of the car and log it,
-    - during the _Cost function of PIDTRAINING when it is used, 
-    - and in the calculation in D and I, in the role of dT. (dT is proportional to the reciprocal of the car's speed, so 1/speed is used there).
+    - during the _Cost_ function of PIDTRAINING when it is used, 
+    - and in the calculation in D and I error, in the role of dT. (dT is proportional to the reciprocal of the car's speed, so 1/speed is used there).
 The reply message contains:
 - steering_angle - Steering wheel angle to be used, in a [-1,1] interval. 
 - throttle - Gas pedal throttle value to be used in the simulator.
@@ -37,8 +38,8 @@ The final I component will enhance this further by increasing the corrective val
 ## Hyperparameter tuning, optimization.
 
 I am using 2 PI controllers: One for the steering angle and one for speed. Initially the latter was a P controller (I and D were 0 as those are not required at the throttle/speed control in my opinion) but later I found it much better to change it to a binary "logic": If the speed is below optimal_speed the throttle=predefined_max_throttle, otherwise throttle=0. I achieved this by using this PID controller setup:
-        pid_throttle.Init(9999, 0, 0);      
-So, here the P coefficient will be a huge number. Moreover I limit the PID's returned _error_ between 0 lower and predefined_max_throttle upper bound.
+        pid_throttle.Init(999999, 0, 0);      
+Here, the P coefficient is a big number. Moreover I limit the PID's returned _error_ between 0 lower and predefined_max_throttle upper bound.
 
 To find the best coefficients for the steering angle PID controller, I have used many methods:
 - Manual: Finding a good enough P value is not so easy, the amplitude of the oscillation and the sustain/increase of it in time is visible in the simulator. After that the D coefficient can be guessed by trial and error and by checking that the aplitude of the oscillations when the car tries to go back inside toward the center of the road. If the overshoot is not too big, it's a good D value. I have used 0 for the I coefficient during the manual tuning.
@@ -55,6 +56,5 @@ The logging of the PIDTRAINER can be switched on by #define-ing USE_LOGGING at t
 * The automatic twiddle algorithm could not be used for a long time because of the simulator, as it hangs (does not react to any user input and does not connect) after about half a day. I was using the _magic_ '42["reset",{}]' message to restart the simulator everytime, maybe it was not tested ? 
 * json.hpp could not be used with the newest STL on windows, as it's a very old version (2.1.1). I had to copy the json.hpp from the CarND-Path-Planning project, it's newer and it compiles correctly (it's version is 3.0.0). 
 * Sometime the websocket connection handshaking fails, and the connection forcibly closed by the server (PID controller app). The cause of this is that the maximum message length ( payload ) is by default only 16Kbytes in the uwebsockets implementation. If I start the simulator first, then the PID controller a little bit later, it often led to failed connection attempts. I have fixed this for the newest version used on my local windows machine ( when UWS_VCPKG is defined in the beginning of main.cpp ) but the Udacity version still contain this error.      
-* Oscillations are still too annoying. There should be a way to decrease these further. 
 
  
