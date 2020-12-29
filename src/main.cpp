@@ -11,7 +11,6 @@
 	// When the Udacity version of the uwebsockets library is used
 	#include <uWS/uWS.h>
 	#include "json.hpp"
-//	#include "json_300.hpp"
 #endif 
 
 #include "PID.h"
@@ -32,7 +31,7 @@ PIDTRAINER* pt = nullptr;
 #ifdef USE_TRAINING
 	double optimal_speed = 50;
 #else 
-	double optimal_speed = 50;
+	double optimal_speed = 30;
 #endif 
 
 // Checks if the SocketIO event has JSON data.
