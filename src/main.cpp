@@ -60,9 +60,9 @@ void init(int argc, char** argv, PID& pid, PID& pid_throttle)
 //    p1 = 0.168901;
 //    i1 = 0.00517276;
 //    d1 = 3.87919;
-	p1 = 0.0492749;  
-	i1 = 4.20316e-06;
-	d1 = 0.532;
+	p1 = 0.164142; 
+	i1 = 4.4004e-06;
+	d1 = 9.23562;
 
 #ifdef USE_TRAINING
 	double de1, de2, de3;
@@ -76,7 +76,7 @@ void init(int argc, char** argv, PID& pid, PID& pid_throttle)
 		de3 = atof(argv[6]);
 	}
 
-	pt = new PIDTRAINER(&pid, 4250, p1, i1, d1, de1, de2, de3);
+	pt = new PIDTRAINER(&pid, 4500, p1, i1, d1, de1, de2, de3);
 #endif 
 
 	pid.Init(p1, i1, d1);
