@@ -30,7 +30,7 @@ double rad2deg(double x) { return x * 180 / pi(); }
 PIDTRAINER* pt = nullptr;
 
 #ifdef USE_TRAINING
-	double optimal_speed = 75;
+	double optimal_speed = 50;
 #else 
 	double optimal_speed = 50;
 #endif 
@@ -60,9 +60,9 @@ void init(int argc, char** argv, PID& pid, PID& pid_throttle)
 //    p1 = 0.168901;
 //    i1 = 0.00517276;
 //    d1 = 3.87919;
-	p1 = 0.15;
-	i1 = 0.006;
-	d1 = 4;
+	p1 = 0.01;
+	i1 = 0.005;
+	d1 = 3.8;
 
 #ifdef USE_TRAINING
 	double de1, de2, de3;
@@ -76,11 +76,11 @@ void init(int argc, char** argv, PID& pid, PID& pid_throttle)
 		de3 = atof(argv[6]);
 	}
 
-	pt = new PIDTRAINER(&pid, 1000, p1, i1, d1, de1, de2, de3);
+	pt = new PIDTRAINER(&pid, 1800, p1, i1, d1, de1, de2, de3);
 #endif 
 
 	pid.Init(p1, i1, d1);
-	pid_throttle.Init(9999, 0, 0);
+	pid_throttle.Init(999999, 0, 0);
 }
 
 // the logic which uses the 2 PID controllers to control the new steer_value and throttle
@@ -92,7 +92,7 @@ void logic( PID &pid, PID &pid_throttle, double cte, double speed, double angle,
 	steer_value = max(steer_value, -1.0);
 	pid_throttle.UpdateError(speed - optimal_speed, speed, angle);
 	throttle = pid_throttle.TotalError();
-	throttle = min(throttle, 0.3);
+	throttle = min(throttle, 1.0);
 	throttle = max(throttle, 0.0);
 };
 
@@ -145,8 +145,7 @@ std::string process_message(const char* data, size_t length, PID& pid, PID& pid_
 			// Manual driving
 			msg = "42[\"manual\",{}]";
 		}
-	}  // end websocket message if
-
+	}  // end websocket message if 
 	return msg;
 }
 
@@ -165,11 +164,11 @@ int main(int argc, char **argv) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
-    	printf("msg1\n");
 	  auto msg = process_message(data, length, pid, pid_throttle);
-    	printf("msg11\n");
-	  ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);	  
-    	printf("msg2\n");
+    if (!msg.empty())
+    {
+	    ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);	  
+    }
   }); // end h.onMessage
 
   h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {

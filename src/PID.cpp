@@ -31,6 +31,10 @@ void PID::Init(double Kp_, double Ki_, double Kd_) {
 
 void PID::UpdateError(double cte, double speed, double angle) {
 	p_error = Kp * cte;
+
+	if (speed<0.001) speed = 0.001;								// don't divide by zero
+	double dt_proportional = 100 / speed;					// this value is 100* the reciprocal of the current speed thus it's proportional to dt.
+
 	if (bFirstUpdate)
 	{
 		d_error = 0;
@@ -38,11 +42,11 @@ void PID::UpdateError(double cte, double speed, double angle) {
 	}
 	else
 	{
-		d_error = Kd * (cte - prev_cte);
+		d_error = Kd * (cte - prev_cte) / dt_proportional;			// Derivative -> Sum -> Multiply error by dt
 	}
 	prev_cte = cte;
 	sum_cte += cte;
-	i_error = Ki * sum_cte;
+	i_error = Ki * sum_cte * dt_proportional;			// Integral -> *d/dt -> Divide error by dt
 
 #ifdef USE_SPEED_WEIGHT
 	spd_error = 2000*exp( -speed/50.0 );
