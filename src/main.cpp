@@ -57,9 +57,6 @@ void init(int argc, char** argv, PID& pid, PID& pid_throttle)
 	double p1, d1, i1;
 
 	// the previously fine-tuned, best PID coefficients
-//    p1 = 0.168901;
-//    i1 = 0.00517276;
-//    d1 = 3.87919;
 	p1 = 0.164142; 
 	i1 = 4.4004e-06;
 	d1 = 9.23562;
