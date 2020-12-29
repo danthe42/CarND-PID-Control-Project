@@ -15,7 +15,10 @@ The message from the simulator contains fields:
 - CTE - The cross-track error is an error value which is proportional to the (signed) distance of the car from the center of the road.
 - speed - Current speed of the car
 - steering_angle - Current steering angle of the car, in degrees
-  The algorithm does not use the _steering_angle_ value at all, and the _speed_ parameter is only used during training to calculate the average speed of the car to log it.
+  The algorithm use the _steering_angle_ value only in the _Cost_ function of PIDTRAINING where it's configured, and the _speed_ parameter is used 
+    - during training to calculate the average speed of the car and log it,
+    - during the _Cost function of PIDTRAINING when it is used, 
+    - and in the calculation in D and I, in the role of dT. (dT is proportional to the reciprocal of the car's speed, so 1/speed is used there).
 The reply message contains:
 - steering_angle - Steering wheel angle to be used, in a [-1,1] interval. 
 - throttle - Gas pedal throttle value to be used in the simulator.
