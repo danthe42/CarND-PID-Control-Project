@@ -60,7 +60,7 @@ void PID::UpdateError(double cte, double speed, double angle) {
 	angle_error = 0;
 #endif
 
-	if (total_samplelen < samplenum * 2)			// only use the second half of this run
+	if (double(total_samplelen)*0.8 < samplenum )			// only use the second half of this run
 	{
 		total_cte_err += cte * cte + spd_error + angle_error;
 		sum_spd += speed;
